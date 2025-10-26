@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { TradeWithPrice } from "./types.js";
+import { findLink } from "./web-scraper.js";
 
 /**
  * Scrape politician trades with price information from Capitol Trades
@@ -153,6 +154,86 @@ export async function scrapePoliticianTrades(url: string): Promise<TradeWithPric
     throw error;
   } finally {
     await browser.close();
+  }
+}
+
+/**
+ * Get the issuer ID from Capitol Trades
+ * @param issuer - The issuer query (e.g., "AAPL", "Microsoft")
+ * @returns The issuer ID (e.g., "apple-inc", "microsoft-corp")
+ */
+export async function getIssuerId(issuer: string): Promise<string> {
+  const url = "https://www.capitoltrades.com/issuers";
+  const urlWithQueryParams = `${url}?search=${encodeURIComponent(issuer)}`;
+
+  try {
+    // Find the issuer page link
+    const linkResult = await findLink(
+      urlWithQueryParams,
+      (link) => {
+        return link.href.includes("issuers/");
+      }
+    );
+
+    // Extract the issuer ID from the URL
+    // URL format: https://www.capitoltrades.com/issuers/issuer-id
+    const urlParts = linkResult.targetUrl.split("issuers/");
+    if (urlParts.length < 2) {
+      throw new Error(`Invalid issuer URL format: ${linkResult.targetUrl}`);
+    }
+
+    // Get the issuer ID (might include query params, remove them)
+    const issuerIdWithParams = urlParts[1];
+    const issuerId = issuerIdWithParams.split("?")[0].split("#")[0].trim();
+
+    if (!issuerId) {
+      throw new Error(`Could not extract issuer ID from URL: ${linkResult.targetUrl}`);
+    }
+
+    return issuerId;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get issuer ID for "${issuer}": ${errorMessage}`);
+  }
+}
+
+/**
+ * Get the politician ID from Capitol Trades
+ * @param politician - The politician query (e.g., "Michael", "Nancy Pelosi")
+ * @returns The politician ID (e.g., "C001129")
+ */
+export async function getPoliticianId(politician: string): Promise<string> {
+  const url = "https://www.capitoltrades.com/politicians";
+  const urlWithQueryParams = `${url}?search=${encodeURIComponent(politician)}`;
+
+  try {
+    // Find the politician page link
+    const linkResult = await findLink(
+      urlWithQueryParams,
+      (link) => {
+        return link.href.includes("politicians/");
+      }
+    );
+
+    // Extract the politician ID from the URL
+    // URL format: https://www.capitoltrades.com/politicians/C001129
+    const urlParts = linkResult.targetUrl.split("politicians/");
+    if (urlParts.length < 2) {
+      throw new Error(`Invalid politician URL format: ${linkResult.targetUrl}`);
+    }
+
+    // Get the politician ID (might include query params, remove them)
+    const politicianIdWithParams = urlParts[1];
+    const politicianId = politicianIdWithParams.split("?")[0].split("#")[0].trim();
+
+    if (!politicianId) {
+      throw new Error(`Could not extract politician ID from URL: ${linkResult.targetUrl}`);
+    }
+
+    return politicianId;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get politician ID for "${politician}": ${errorMessage}`);
   }
 }
 
