@@ -5,7 +5,7 @@
  * Run with: npx tsx test/test-scraper.ts
  */
 
-import { scrapePoliticianTrades, findLink } from "../src/scraper.js";
+import { scrapePoliticianTrades, findLink, getIssuerId, getPoliticianId } from "../src/scraper.js";
 
 async function testPoliticianTrades() {
   console.log("🧪 Testing Politician Trades Scraper\n");
@@ -56,9 +56,57 @@ async function testPoliticianTrades() {
   }
 }
 
+async function testGetIssuerId() {
+  console.log("\n🧪 Testing Get Issuer ID\n");
+  console.log("=".repeat(60));
+
+  // Test with different issuer queries
+  const testIssuers = ["Apple", "Microsoft", "Tesla", "NVIDIA"];
+
+  for (const issuer of testIssuers) {
+    try {
+      console.log(`\nTesting with issuer: "${issuer}"`);
+      const issuerId = await getIssuerId(issuer);
+      console.log(`✓ Success! Issuer ID: ${issuerId}`);
+    } catch (error) {
+      console.error(`❌ Failed for "${issuer}":`, error instanceof Error ? error.message : error);
+    }
+  }
+
+  console.log("\n" + "=".repeat(60));
+}
+
+async function testGetPoliticianId() {
+  console.log("\n🧪 Testing Get Politician ID\n");
+  console.log("=".repeat(60));
+
+  // Test with different politician queries
+  const testPoliticians = ["Michael", "Nancy Pelosi", "Josh", "Mitch"];
+
+  for (const politician of testPoliticians) {
+    try {
+      console.log(`\nTesting with politician: "${politician}"`);
+      const politicianId = await getPoliticianId(politician);
+      console.log(`✓ Success! Politician ID: ${politicianId}`);
+    } catch (error) {
+      console.error(`❌ Failed for "${politician}":`, error instanceof Error ? error.message : error);
+    }
+  }
+
+  console.log("\n" + "=".repeat(60));
+}
+
 // Run tests
-testPoliticianTrades().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+async function runTests() {
+  try {
+    await testGetIssuerId();
+    await testGetPoliticianId();
+    await testPoliticianTrades();
+  } catch (error) {
+    console.error("Fatal error:", error);
+    process.exit(1);
+  }
+}
+
+runTests();
 

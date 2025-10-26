@@ -8,4 +8,4 @@ export { scrapeWebPage, extractLinks, extractText, findLink } from "./web-scrape
 export type { ScrapedData, LinkData } from "./web-scraper.js";
 
 // Export politician trades scraper
-export { scrapePoliticianTrades } from "./politician-trades-scraper.js";
+export { scrapePoliticianTrades, getIssuerId, getPoliticianId } from "./politician-trades-scraper.js";
