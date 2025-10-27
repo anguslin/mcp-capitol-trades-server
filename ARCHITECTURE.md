@@ -26,13 +26,15 @@
 │  │  ┌────────────────────────────────────────────────────┐  │  │
 │  │  │  Tool Registry (1 specialized tool)                │  │  │
 │  │  │                                                     │  │  │
-│  │  │  get_politician_trades                             │  │  │
-│  │  │     ├─ Stock validation (ticker/name)              │  │  │
-│  │  │     ├─ Days filter (30, 90, 180, 365)              │  │  │
-│  │  │     ├─ Searches Capitol Trades                     │  │  │
-│  │  │     ├─ Finds issuer page                           │  │  │
-│  │  │     ├─ Scrapes politician trades                   │  │  │
-│  │  │     └─ Returns trade data with prices              │  │  │
+  │  │  │  get_politician_trades                             │  │  │
+  │  │  │     ├─ Stock filter (optional)                      │  │  │
+  │  │  │     ├─ Politician filter (optional)                │  │  │
+  │  │  │     ├─ Party filter (DEMOCRAT/REPUBLICAN)          │  │  │
+  │  │  │     ├─ Type filter (BUY/SELL/RECEIVE/EXCHANGE)      │  │  │
+  │  │  │     ├─ Days filter (30, 90, 180, 365)              │  │  │
+  │  │  │     ├─ Searches Capitol Trades /trades endpoint    │  │  │
+  │  │  │     ├─ Paginates through results                   │  │  │
+  │  │  │     └─ Returns trade data (up to 50 trades)         │  │  │
 │  │  └────────────────────────────────────────────────────┘  │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                  │
@@ -41,12 +43,13 @@
   │  │  ┌────────────────────────────────────────────────────┐ │  │
   │  │  │  Politician Trade Scraping                        │ │  │
   │  │  │                                                    │ │  │
-  │  │  │  • scrapePoliticianTrades(url)                     │ │  │
-  │  │  │    ├─ Uses Playwright for dynamic content          │ │  │
+  │  │  │  • scrapePoliticianTrades(url, limit)              │ │  │
+  │  │  │    ├─ Uses Cheerio for static HTML parsing        │ │  │
+  │  │  │    ├─ Supports pagination (up to 50 trades)         │ │  │
   │  │  │    ├─ Extracts politician names                    │ │  │
   │  │  │    ├─ Extracts transaction type (buy/sell)         │ │  │
   │  │  │    ├─ Extracts size ranges                         │ │  │
-  │  │  │    ├─ Extracts prices                              │ │  │
+  │  │  │    ├─ Extracts dates                               │ │  │
   │  │  │    └─ Returns structured trade data                │ │  │
   │  │  └────────────────────────────────────────────────────┘ │  │
   │  └──────────────────────────────────────────────────────────┘  │
@@ -103,19 +106,18 @@
    - Calls getPoliticianTrades()
    - Constructs search URL
           ↓
-5. Web Scraper (web-scraper.ts)
-   - Searches Capitol Trades for stock
-   - Finds issuer page link
-   - Adds date filter (?txDate=90d)
+5. Get Politician/Issuer IDs
+   - If stock provided: calls getIssuerId(stock)
+   - If politician provided: calls getPoliticianId(politician)
+   - Searches Capitol Trades search pages
           ↓
-6. Politician Trade Scraper
-   - Uses Playwright to load page
-   - Handles dynamic content (React app)
-   - Waits for data to load
+6. Construct /trades URL
+   - Builds URL with query parameters
+   - Filters by issuer, politician, party, type, days
           ↓
 7. Capitol Trades Website
-   - Returns dynamic HTML
-   - Contains trade data in React components
+   - Returns static HTML from /trades endpoint
+   - Contains trade data in table format
           ↓
 8. Parser (politician-trades-scraper.ts)
    - Extracts politician information
@@ -167,13 +169,14 @@
 - Date parsing
 
 **Key Functions:**
-- `scrapePoliticianTrades()` - Main trade extraction
-- Handles wait states for React components
+- `scrapePoliticianTrades()` - Main trade extraction with pagination
+- `scrapePoliticianTradesSinglePage()` - Single page scraper
 - Extracts trade table data
 - Parses politician information
+- Validates empty rows
 
 **Dependencies:**
-- `playwright` - Browser automation
+- `axios` - HTTP client
 - `cheerio` - HTML parsing
 
 ### 3. Web Scraper (`web-scraper.ts`)
@@ -390,8 +393,7 @@ finance-mcp-server
 │   └── HTTP client
 ├── cheerio@1.0.0-rc.12
 │   └── HTML parser
-├── playwright@1.56.1
-│   └── Browser automation
+(Playwright removed - using static HTML parsing)
 └── node-fetch@3.3.2
     └── Fetch API polyfill
 ```
@@ -403,14 +405,14 @@ Total Package Size: ~15MB (with node_modules)
 
 Build Output:
   - index.js:                      ~50KB
-  - politician-trades-scraper.js:  ~70KB
+  - politician-trades-scraper.js:  ~60KB
   - web-scraper.js:                ~6KB
   - Type definitions:              ~5KB
   - Source maps:                   ~20KB
 
 Source Code:
-  - index.ts:        ~170 lines
-  - politician-trades-scraper.ts: ~370 lines
+  - index.ts:        ~240 lines
+  - politician-trades-scraper.ts: ~287 lines
   - web-scraper.js:  ~60 lines
   - types.ts:        ~30 lines
   
@@ -438,10 +440,9 @@ DEBUG=mcp:* node build/src/index.js
 | Issue | Cause | Solution |
 |-------|-------|----------|
 | Server not found | Wrong path in config | Check absolute path (build/src/index.js) |
-| Playwright not installed | Missing browsers | Run `npx playwright install` |
 | Timeout errors | Slow website | Network issue or site down |
-| No trades found | Invalid stock name | Try different stock/ticker |
-| Token errors | GitHub MCP | Get new GitHub personal access token |
+| No trades found | No trades in time period | Try different filters or increase days |
+| Empty page errors | Pagination limit | Results limited to 50 trades |
 
 ## Best Practices
 

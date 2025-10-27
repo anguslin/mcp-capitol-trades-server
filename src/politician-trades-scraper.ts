@@ -1,159 +1,206 @@
-import { chromium } from "playwright";
+import axios from "axios";
+import * as cheerio from "cheerio";
 import { TradeWithPrice } from "./types.js";
 import { findLink } from "./web-scraper.js";
 
 /**
- * Scrape politician trades with price information from Capitol Trades
- * Uses Playwright to extract trade data including prices from hover tooltips
- * @param url - The Capitol Trades issuer page URL with date filter
- * @returns Array of politician trades with price data
+ * Scrape a single page of trades from the /trades page
+ * Uses cheerio for static HTML parsing
+ * @param url - The Capitol Trades /trades URL with filters and page number
+ * @returns Array of politician trades with price data from the current page
  */
-export async function scrapePoliticianTrades(url: string): Promise<TradeWithPrice[]> {
-  // Launch browser
-  const browser = await chromium.launch({ 
-    headless: true,
-    timeout: 60000
-  });
-  const page = await browser.newPage();
-
+async function scrapePoliticianTradesSinglePage(url: string): Promise<TradeWithPrice[]> {
   try {
-    // Navigate to the page
-    await page.goto(url, { waitUntil: "networkidle" });
+    // Fetch the page with increased timeout
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+      },
+      timeout: 60000, // Increased to 60 seconds
+      maxRedirects: 5,
+      validateStatus: function (status) {
+        return status >= 200 && status < 300;
+      },
+    });
 
-    // Wait for table to be present
-    await page.waitForSelector("tbody tr", { timeout: 10000 });
-
-    // Get all trade rows
-    const rows = await page.locator("tbody tr").all();
+    const $ = cheerio.load(response.data);
     const trades: TradeWithPrice[] = [];
 
-    // Iterate through each row
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      
+    // Try different row selectors
+    let rows = $("tbody tr");
+    
+    // If no rows found, try alternate selectors
+    if (rows.length === 0) {
+      rows = $("table tr");
+    }
+    
+    rows.each((index, element) => {
       try {
-        // Extract basic trade info
-        const politicianName = await row.locator(".politician-name a").textContent() || "";
-        const party = await row.locator(".party").textContent() || "";
-        const chamber = await row.locator(".chamber").textContent() || "";
-        const state = await row.locator(".us-state-compact").textContent() || "";
+        const $row = $(element);
+        
+        // Get all cells in the row
+        const cells = $row.find("td");
+        
+        // Extract politician info
+        const politicianName = $row.find(".politician-name a, .politician a").first().text().trim() || "";
+        const party = $row.find(".party").text().trim() || "";
+        const chamber = $row.find(".chamber").text().trim() || "";
+        const state = $row.find(".us-state-compact").text().trim() || "";
 
-        // Get disclosure date
-        const disclosureDateCell = row.locator("td").nth(1);
-        const disclosureDay = await disclosureDateCell.locator(".text-size-3").textContent() || "";
-        const disclosureYear = await disclosureDateCell.locator(".text-size-2").textContent() || "";
-        const disclosureDate = `${disclosureDay} ${disclosureYear}`.trim();
-
-        // Get trade date
-        const tradeDateCell = row.locator("td").nth(2);
-        const tradeDay = await tradeDateCell.locator(".text-size-3").textContent() || "";
-        const tradeYear = await tradeDateCell.locator(".text-size-2").textContent() || "";
-        const tradeDate = `${tradeDay} ${tradeYear}`.trim();
-
-        // Get reporting gap
-        const reportingGap = await row.locator(".reporting-gap-tier--2, .reporting-gap-tier--3, .reporting-gap-tier--4, [class*='reporting-gap-tier']").textContent() || "";
-
-        // Get transaction type
-        const txType = await row.locator(".tx-type").textContent() || "";
-
-        // Get trade size text
-        const tradeSizeText = await row.locator(".trade-size .text-txt-dimmer").textContent() || "";
-
-        // Extract price by hovering over the trade size icon
-        let price = "N/A";
-        try {
-          const tradeSizeElement = row.locator(".trade-size");
-          
-          // Hover over the trade size element
-          await tradeSizeElement.hover({ timeout: 2000 });
-          
-          // Wait for tooltip to appear
-          await page.waitForTimeout(1000);
-          
-          // Try to find the tooltip with price information
-          try {
-            const tooltipContainer = page.locator('.tx-trade-size-tooltip-container').first();
-            
-            if (await tooltipContainer.isVisible({ timeout: 500 })) {
-              const priceValue = await tooltipContainer.locator('.q-cell.cell--price .q-value').textContent();
-              if (priceValue) {
-                price = "$" + priceValue.trim();
-              }
+        // Extract dates - try multiple strategies
+        let disclosureText = "";
+        let tradeText = "";
+        
+        // Try to find dates in specific columns
+        cells.each((i, cell) => {
+          const cellText = $(cell).text().trim();
+          // Look for date patterns (e.g., "23 Oct2025", "Nov 2025")
+          if (/^\d{1,2}\s+\w+20\d{2}$/.test(cellText) || /^\w+\s+20\d{2}$/.test(cellText)) {
+            if (!tradeText) {
+              tradeText = cellText;
+            } else if (!disclosureText) {
+              disclosureText = cellText;
             }
-          } catch {
-            // Tooltip not found, price stays N/A
           }
-        } catch (error) {
-          // Price extraction failed, keep as N/A
+        });
+        
+        const reportingGap = $row.find(".reporting-gap-tier--2, .reporting-gap-tier--3, .reporting-gap-tier--4").text().trim() || "";
+
+        // Extract transaction info
+        const txType = $row.find(".tx-type").text().trim() || "";
+        const tradeSizeText = $row.find(".trade-size .text-txt-dimmer, .trade-size").first().text().trim() || "";
+        
+        // Extract price from tooltip data attribute if available
+        const tradeSizeElement = $row.find(".trade-size");
+        let price = "N/A";
+        const priceData = tradeSizeElement.attr("title") || tradeSizeElement.attr("data-price");
+        if (priceData) {
+          price = priceData.trim();
         }
 
-        // Get issuer info from page header (for issuer-specific pages)
-        let issuerName = "";
-        let issuerTicker = "";
-        
-        if (i === 0) {
-          try {
-            // Try to extract from page title first
-            const title = await page.title();
-            // Title format: "Apple Inc (AAPL:US) trades by politicians"
-            const titleMatch = title.match(/^(.+?)\s*\(([^)]+)\)/);
-            if (titleMatch) {
-              issuerName = titleMatch[1].trim();
-              issuerTicker = titleMatch[2].trim();
-            } else {
-              // Fallback to page elements
-              issuerName = await page.locator("h1").first().textContent({ timeout: 2000 }) || "Unknown";
-              issuerTicker = await page.locator("h2").first().textContent({ timeout: 2000 }) || "N/A";
-            }
-          } catch {
-            issuerName = "Unknown";
-            issuerTicker = "N/A";
-          }
-        } else {
-          // Reuse from first trade
-          issuerName = trades[0]?.issuer?.name || "";
-          issuerTicker = trades[0]?.issuer?.ticker || "";
+        // Extract issuer info
+        const issuerName = $row.find(".issuer-name a, .issuer a").first().text().trim() || "";
+        const issuerTicker = $row.find(".issuer-ticker").text().trim() || "";
+
+        // Validate that this is a real trade row (not empty or header row)
+        // A valid trade should have at least politician name, issuer name, or transaction type
+        if (!politicianName && !issuerName && !txType) {
+          // Skip empty rows
+          return;
         }
 
         const trade: TradeWithPrice = {
-          index: i + 1,
+          index: index + 1,
           politician: {
-            name: politicianName.trim(),
-            party: party.trim(),
-            chamber: chamber.trim(),
-            state: state.trim()
+            name: politicianName,
+            party: party,
+            chamber: chamber,
+            state: state,
           },
           issuer: {
-            name: issuerName.trim(),
-            ticker: issuerTicker.trim()
+            name: issuerName || "Unknown",
+            ticker: issuerTicker || "N/A",
           },
           dates: {
-            disclosure: disclosureDate,
-            trade: tradeDate,
-            reportingGap: reportingGap ? reportingGap + " days" : ""
+            disclosure: disclosureText,
+            trade: tradeText,
+            reportingGap: reportingGap ? reportingGap + " days" : "",
           },
           transaction: {
-            type: txType.trim(),
-            size: tradeSizeText.trim(),
-            price: price
-          }
+            type: txType,
+            size: tradeSizeText,
+            price: price,
+          },
         };
 
         trades.push(trade);
-
       } catch (error) {
-        // Log error but continue processing other rows
-        console.error(`Error processing row ${i + 1}:`, error);
+        console.error(`Error processing row ${index + 1}:`, error);
       }
-    }
+    });
 
     return trades;
-
   } catch (error) {
-    console.error("Error:", error);
-    throw error;
-  } finally {
-    await browser.close();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to scrape politician trades page: ${errorMessage}`);
+  }
+}
+
+/**
+ * Scrape trades from the filtered /trades page with pagination
+ * Uses cheerio for static HTML parsing and loops through pages
+ * @param url - The Capitol Trades /trades URL with filters
+ * @param limit - Maximum number of trades to return (default: 50)
+ * @returns Array of politician trades with price data
+ */
+export async function scrapePoliticianTrades(url: string, limit: number = 50): Promise<TradeWithPrice[]> {
+  const allTrades: TradeWithPrice[] = [];
+  let page = 1;
+  
+  try {
+    // Determine base URL (remove any existing page parameter)
+    const urlObj = new URL(url);
+    urlObj.searchParams.delete("page");
+    const baseUrl = urlObj.toString();
+    
+    console.error(`Scraping politician trades with limit: ${limit}`);
+    
+    while (allTrades.length < limit) {
+      // Construct URL with page parameter
+      const pageUrl = `${baseUrl}&page=${page}`;
+      
+      console.error(`Fetching page ${page} from: ${pageUrl}`);
+      
+      try {
+        // Scrape the current page
+        const pageTrades = await scrapePoliticianTradesSinglePage(pageUrl);
+        
+        // If no trades found, stop pagination
+        if (pageTrades.length === 0) {
+          console.error(`No more trades found at page ${page}`);
+          break;
+        }
+        
+        console.error(`Found ${pageTrades.length} trades on page ${page}`);
+        
+        // Add trades from this page
+        for (const trade of pageTrades) {
+          if (allTrades.length < limit) {
+            // Update index to reflect position in combined results
+            trade.index = allTrades.length + 1;
+            allTrades.push(trade);
+          }
+        }
+        
+        // If we got fewer trades than expected or reached limit, we're done
+        if (pageTrades.length === 0 || allTrades.length >= limit) {
+          break;
+        }
+        
+        page++;
+        
+        // Add a small delay to avoid overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (pageError) {
+        console.error(`Error fetching page ${page}:`, pageError);
+        // If it's the first page and it fails, throw the error
+        // Otherwise, just stop pagination
+        if (page === 1) {
+          throw pageError;
+        }
+        break;
+      }
+    }
+    
+    console.error(`Total trades scraped: ${allTrades.length}`);
+    return allTrades;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to scrape politician trades: ${errorMessage}`);
   }
 }
 
