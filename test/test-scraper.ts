@@ -5,56 +5,7 @@
  * Run with: npx tsx test/test-scraper.ts
  */
 
-import { scrapePoliticianTrades, findLink, getIssuerId, getPoliticianId } from "../src/scraper.js";
-
-async function testPoliticianTrades() {
-  console.log("🧪 Testing Politician Trades Scraper\n");
-  console.log("=".repeat(60));
-
-  // User Inputs
-  const stock = "Apple";
-  const days = 90;
-  
-  // constants for scraping
-  const url = "https://www.capitoltrades.com/issuers";
-  const urlWithQueryParams = `${url}?search=${stock}`;
-  const scrapedLinkIncludes = "issuers/";
-  const scrapedLinkQueryParams = `?txDate=${days}d`;
-
-  try {
-    console.log(`Searching for: ${stock} (${days} days)`);
-    console.log(`Search URL: ${urlWithQueryParams}\n`);
-
-    // Find the issuer page link
-    const linkResult = await findLink(
-      urlWithQueryParams,
-      (link) => {
-        return link.href.includes(scrapedLinkIncludes);
-      }
-    );
-
-    console.log(`✓ Found issuer link: ${linkResult.targetUrl}`);
-
-    // Construct the URL with date filter
-    const urlWithScrapedLinkQueryParams = `${linkResult.targetUrl}${scrapedLinkQueryParams}`; 
-    console.log(`Full URL: ${urlWithScrapedLinkQueryParams}\n`);
-    
-    // Get trades with prices
-    const tradeWithPrices = await scrapePoliticianTrades(urlWithScrapedLinkQueryParams);
-    
-    // Console log all TradeWithPrice values
-    console.log("\n" + "=".repeat(60));
-    console.log("ALL TRADE DATA:");
-    console.log("=".repeat(60));
-    console.log(JSON.stringify(tradeWithPrices, null, 2));
-    
-    console.log(`\n✓ Found ${tradeWithPrices.length} trades`);
-    console.log("=".repeat(60));
-  } catch (error) {
-    console.error("❌ Error:", error instanceof Error ? error.message : error);
-    throw error;
-  }
-}
+import { scrapePoliticianTrades, getIssuerId, getPoliticianId } from "../src/scraper.js";
 
 async function testGetIssuerId() {
   console.log("\n🧪 Testing Get Issuer ID\n");
@@ -96,12 +47,99 @@ async function testGetPoliticianId() {
   console.log("\n" + "=".repeat(60));
 }
 
+async function testGetPoliticianTrades() {
+  console.log("\n🧪 Testing Pagination with /trades endpoint\n");
+  console.log("=".repeat(60));
+
+  try {
+    // Test 1: Filter by stock only
+    console.log("\n📝 Test 1: Filter by stock (Apple)");
+    
+    const stock = "Apple";
+    const days = 90;
+    
+    // Get issuer ID
+    console.log(`Getting issuer ID for: ${stock}`);
+    const issuerId = await getIssuerId(stock);
+    console.log(`✓ Issuer ID: ${issuerId}`);
+    
+    const url1 = `https://www.capitoltrades.com/trades?issuer=${issuerId}&txDate=${days}d`;
+    console.log(`URL: ${url1}`);
+    console.log("Testing pagination with limit: 20");
+    
+    try {
+      const trades1 = await scrapePoliticianTrades(url1, 20);
+      console.log(`✓ Found ${trades1.length} trades`);
+      console.log("\n📊 All Trades:");
+      trades1.forEach((trade, index) => {
+        console.log(`\n${index + 1}. ${trade.politician.name} (${trade.politician.party}) - ${trade.transaction.type} ${trade.transaction.size} of ${trade.issuer.name} (${trade.issuer.ticker})`);
+        console.log(`   Trade Date: ${trade.dates.trade} | Disclosure: ${trade.dates.disclosure}`);
+      });
+    } catch (error) {
+      console.error(`❌ Test 1 failed:`, error instanceof Error ? error.message : error);
+    }
+    
+    // Test 2: Filter by type only
+    console.log("\n📝 Test 2: Filter by type (BUY)");
+    
+    const url2 = `https://www.capitoltrades.com/trades?txType=buy&txDate=90d`;
+    console.log(`URL: ${url2}`);
+    console.log("Testing pagination with limit: 10");
+    
+    try {
+      const trades2 = await scrapePoliticianTrades(url2, 10);
+      console.log(`✓ Found ${trades2.length} trades`);
+      console.log("\n📊 All Trades:");
+      trades2.forEach((trade, index) => {
+        console.log(`\n${index + 1}. ${trade.politician.name} (${trade.politician.party}) - ${trade.transaction.type} ${trade.transaction.size} of ${trade.issuer.name} (${trade.issuer.ticker})`);
+        console.log(`   Trade Date: ${trade.dates.trade} | Disclosure: ${trade.dates.disclosure}`);
+      });
+    } catch (error) {
+      console.error(`❌ Test 2 failed:`, error instanceof Error ? error.message : error);
+    }
+    
+    // Test 3: Test empty page detection
+    console.log("\n📝 Test 3: Empty page detection (small stock with limited trades)");
+    
+    const stock2 = "Tesla";
+    console.log(`Getting issuer ID for: ${stock2}`);
+    const issuerId2 = await getIssuerId(stock2);
+    console.log(`✓ Issuer ID: ${issuerId2}`);
+    
+    const url3 = `https://www.capitoltrades.com/trades?issuer=${issuerId2}&txDate=30d`;
+    console.log(`URL: ${url3}`);
+    console.log("Testing with limit: 50 (should stop early if no trades)");
+    
+    try {
+      const trades3 = await scrapePoliticianTrades(url3, 50);
+      console.log(`✓ Found ${trades3.length} trades (should stop pagination when empty)`);
+      if (trades3.length > 0) {
+        console.log("\n📊 All Trades:");
+        trades3.forEach((trade, index) => {
+          console.log(`\n${index + 1}. ${trade.politician.name} (${trade.politician.party}) - ${trade.transaction.type} ${trade.transaction.size} of ${trade.issuer.name} (${trade.issuer.ticker})`);
+          console.log(`   Trade Date: ${trade.dates.trade} | Disclosure: ${trade.dates.disclosure}`);
+        });
+      }
+    } catch (error) {
+      console.error(`❌ Test 3 failed:`, error instanceof Error ? error.message : error);
+    }
+    
+    console.log("\n" + "=".repeat(60));
+    console.log("✅ Pagination test completed!");
+    console.log("=".repeat(60));
+    
+  } catch (error) {
+    console.error("❌ Error:", error instanceof Error ? error.message : error);
+    throw error;
+  }
+}
+
 // Run tests
 async function runTests() {
   try {
     await testGetIssuerId();
     await testGetPoliticianId();
-    await testPoliticianTrades();
+    await testGetPoliticianTrades();
   } catch (error) {
     console.error("Fatal error:", error);
     process.exit(1);

@@ -29,15 +29,9 @@ npm run build
 
 ✅ **Status:** Build folder contains the compiled JavaScript at `build/src/index.js`
 
-### Step 2: Install Playwright (Required)
+### Step 2: No Additional Installation Required
 
-The server uses Playwright for browser automation:
-
-```bash
-npx playwright install
-```
-
-This downloads the necessary browser binaries for scraping dynamic content.
+The server uses Cheerio for static HTML parsing, which requires no additional installation.
 
 ## Configuration
 
@@ -97,18 +91,40 @@ Restart Claude Desktop or Cursor completely to load the MCP server.
 
 ## Tools Provided
 
-### `get_politician_trades` ⭐ Featured
+### `get_politician_trades` ⭐ Featured Tool
+
+Extract politician stock trades with advanced filtering options.
 
 Get politician stock trades with price information from Capitol Trades. Searches for a stock by ticker or company name and returns recent trades by politicians.
 
 **Parameters:**
-- `stock` (required): The stock ticker symbol or company name (e.g., 'Apple', 'AAPL', 'Microsoft')
+- `stock` (optional): The stock ticker symbol or company name (e.g., 'Apple', 'AAPL', 'Microsoft')
+- `politician` (optional): The politician name to search for (e.g., 'Michael', 'Nancy Pelosi')
+- `party` (optional): Filter by party - "DEMOCRAT" or "REPUBLICAN"
+- `type` (optional): Array of transaction types - ["BUY", "SELL", "RECEIVE", "EXCHANGE"]
 - `days` (optional): Number of days to look back - must be 30, 90, 180, or 365 (default: 90)
 
-**Example Request:**
+**Example Request 1 - Filter by stock:**
 ```json
 {
   "stock": "Apple",
+  "days": 90
+}
+```
+
+**Example Request 2 - Filter by politician:**
+```json
+{
+  "politician": "Nancy Pelosi",
+  "days": 180
+}
+```
+
+**Example Request 3 - Filter by party and type:**
+```json
+{
+  "party": "DEMOCRAT",
+  "type": ["BUY", "SELL"],
   "days": 90
 }
 ```
@@ -156,8 +172,9 @@ Get politician stock trades with price information from Capitol Trades. Searches
 "Get politician trades for Microsoft in the last 90 days"
 "What trades did politicians make in Apple stock recently?"
 "Show me all Tesla trades by politicians in the last 180 days"
-"Find all Amazon trades from the last year with prices"
-"Get all politician trades for NVIDIA"
+"Show me all Democrat buys in the last 90 days"
+"Get all trades by Nancy Pelosi in the last 365 days"
+"What Republican sells happened in the last 30 days?"
 ```
 
 **Analysis Queries:**

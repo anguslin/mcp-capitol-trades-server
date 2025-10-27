@@ -5,7 +5,8 @@
 Run the test script to verify everything works:
 
 ```bash
-npm run test:scraper
+npm run build
+node build/test/test-scraper.js
 ```
 
 Or manually:
@@ -14,41 +15,51 @@ Or manually:
 npx tsx test/test-scraper.ts
 ```
 
-This will test getting politician trades for Apple in the last 90 days.
+This will test:
+1. Getting issuer IDs for various stocks
+2. Getting politician IDs for various politicians
+3. Testing pagination with filtered trades
 
 ## Testing get_politician_trades Tool
 
-### Test with Different Stocks
+### Test with Different Filters
 
-**Test 1: Apple Trades**
+**Test 1: Filter by Stock (Apple)**
 ```json
 {
   "stock": "Apple",
   "days": 90
 }
 ```
+Expected: Returns up to 50 politician trades in Apple stock from the last 90 days
 
-Expected: Returns politician trades in Apple stock from the last 90 days
-
-**Test 2: Microsoft with Different Time Period**
+**Test 2: Filter by Politician**
 ```json
 {
-  "stock": "Microsoft",
+  "politician": "Nancy Pelosi",
   "days": 180
 }
 ```
+Expected: Returns all trades by Nancy Pelosi from the last 180 days
 
-Expected: Returns politician trades in Microsoft from the last 180 days
-
-**Test 3: Tesla with 30 Days**
+**Test 3: Filter by Party and Type**
 ```json
 {
-  "stock": "Tesla",
-  "days": 30
+  "party": "DEMOCRAT",
+  "type": ["BUY"],
+  "days": 90
 }
 ```
+Expected: Returns Democrat buy transactions from the last 90 days
 
-Expected: Returns politician trades in Tesla from the last 30 days
+**Test 4: Filter by Type Only**
+```json
+{
+  "type": ["SELL"],
+  "days": 90
+}
+```
+Expected: Returns all sell transactions from the last 90 days
 
 ## Interactive Testing with Claude Desktop
 
@@ -257,5 +268,11 @@ The easiest way to test:
 npx tsx test/test-scraper.ts
 ```
 
-This will automatically test getting politician trades for Apple with the default configuration.
+This will automatically test:
+1. ✓ Issuer ID lookups for Apple, Microsoft, Tesla, NVIDIA
+2. ✓ Politician ID lookups for various politicians  
+3. ✓ Pagination with filtered trades
+4. ✓ Empty page detection
+
+The test prints all trades in a readable format showing politician, transaction type, company, and dates.
 
