@@ -3,6 +3,14 @@ import * as cheerio from "cheerio";
 import { TradeWithPrice } from "./types.js";
 import { findLink } from "./web-scraper.js";
 
+// Helper for conditional logging
+const DEBUG = process.env.DEBUG === "true";
+const logDebug = (...args: any[]) => {
+  if (DEBUG) {
+    console.error(...args);
+  }
+};
+
 /**
  * Scrape a single page of trades from the /trades page
  * Uses cheerio for static HTML parsing
@@ -147,13 +155,13 @@ export async function scrapePoliticianTrades(url: string, limit: number = 50): P
     urlObj.searchParams.delete("page");
     const baseUrl = urlObj.toString();
     
-    console.error(`Scraping politician trades with limit: ${limit}`);
+    logDebug(`Scraping politician trades with limit: ${limit}`);
     
     while (allTrades.length < limit) {
       // Construct URL with page parameter
       const pageUrl = `${baseUrl}&page=${page}`;
       
-      console.error(`Fetching page ${page} from: ${pageUrl}`);
+      logDebug(`Fetching page ${page} from: ${pageUrl}`);
       
       try {
         // Scrape the current page
@@ -161,11 +169,11 @@ export async function scrapePoliticianTrades(url: string, limit: number = 50): P
         
         // If no trades found, stop pagination
         if (pageTrades.length === 0) {
-          console.error(`No more trades found at page ${page}`);
+          logDebug(`No more trades found at page ${page}`);
           break;
         }
         
-        console.error(`Found ${pageTrades.length} trades on page ${page}`);
+        logDebug(`Found ${pageTrades.length} trades on page ${page}`);
         
         // Add trades from this page
         for (const trade of pageTrades) {
@@ -186,7 +194,7 @@ export async function scrapePoliticianTrades(url: string, limit: number = 50): P
         // Add a small delay to avoid overwhelming the server
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (pageError) {
-        console.error(`Error fetching page ${page}:`, pageError);
+        logDebug(`Error fetching page ${page}:`, pageError);
         // If it's the first page and it fails, throw the error
         // Otherwise, just stop pagination
         if (page === 1) {
@@ -196,7 +204,7 @@ export async function scrapePoliticianTrades(url: string, limit: number = 50): P
       }
     }
     
-    console.error(`Total trades scraped: ${allTrades.length}`);
+    logDebug(`Total trades scraped: ${allTrades.length}`);
     return allTrades;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -281,6 +289,409 @@ export async function getPoliticianId(politician: string): Promise<string> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to get politician ID for "${politician}": ${errorMessage}`);
+  }
+}
+
+/**
+ * Get top traded stocks by politicians
+ */
+export async function getTopTradedStocks(limit: number, days: number) {
+  try {
+    // Fetch all trades (no filters except days)
+    const url = `https://www.capitoltrades.com/trades?txDate=${days}d`;
+    
+    logDebug(`Fetching all trades for top stocks analysis`);
+    
+    // Get all trades (will be limited by scrapePoliticianTrades)
+    const trades = await scrapePoliticianTrades(url, 500); // Get more for better statistics
+    
+    // Group trades by issuer (stock)
+    const stockCounts = new Map<string, { count: number; ticker: string; name: string }>();
+    
+    for (const trade of trades) {
+      const key = trade.issuer.name || "Unknown";
+      if (!stockCounts.has(key)) {
+        stockCounts.set(key, { 
+          count: 0, 
+          ticker: trade.issuer.ticker,
+          name: trade.issuer.name
+        });
+      }
+      const stock = stockCounts.get(key)!;
+      stock.count++;
+      // Update ticker if available
+      if (trade.issuer.ticker && trade.issuer.ticker !== "N/A") {
+        stock.ticker = trade.issuer.ticker;
+      }
+    }
+    
+    // Convert to array, sort by count, and take top N
+    const sortedStocks = Array.from(stockCounts.entries())
+      .map(([name, data]) => ({
+        issuer: name,
+        ticker: data.ticker,
+        tradeCount: data.count
+      }))
+      .sort((a, b) => b.tradeCount - a.tradeCount)
+      .slice(0, limit);
+    
+    return {
+      limit,
+      days,
+      totalStocks: sortedStocks.length,
+      stocks: sortedStocks
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get top traded stocks: ${errorMessage}`);
+  }
+}
+
+/**
+ * Get politician statistics including trading breakdown and top assets
+ */
+export async function getPoliticianStats(politician: string, days: number) {
+  try {
+    // Get politician ID
+    const politicianId = await getPoliticianId(politician);
+    
+    // Fetch all trades for this politician
+    const url = `https://www.capitoltrades.com/trades?politician=${politicianId}&txDate=${days}d`;
+    const trades = await scrapePoliticianTrades(url, 200);
+    
+    // Calculate statistics
+    const stats = {
+      politician,
+      days,
+      totalTrades: trades.length,
+      buys: trades.filter(t => t.transaction.type?.toLowerCase() === 'buy').length,
+      sells: trades.filter(t => t.transaction.type?.toLowerCase() === 'sell').length,
+      receives: trades.filter(t => t.transaction.type?.toLowerCase() === 'receive').length,
+      exchanges: trades.filter(t => t.transaction.type?.toLowerCase() === 'exchange').length,
+      buySellRatio: 0, // Will calculate below
+      mostTradedAssets: [] as Array<{issuer: string, ticker: string, transactionCount: number}>,
+    };
+    
+    // Calculate buy/sell ratio
+    if (stats.sells > 0) {
+      stats.buySellRatio = parseFloat((stats.buys / stats.sells).toFixed(2));
+    } else if (stats.buys > 0) {
+      stats.buySellRatio = stats.buys; // More buys than sells
+    }
+    
+    // Group all trades by issuer to find most traded assets (includes stocks, ETFs, bonds, etc.)
+    const assetMap = new Map<string, { ticker: string, count: number }>();
+    
+    for (const trade of trades) {
+      // Count ALL transaction types (buy, sell, receive, exchange)
+      const key = trade.issuer.name || "Unknown";
+      if (!assetMap.has(key)) {
+        assetMap.set(key, { ticker: trade.issuer.ticker, count: 0 });
+      }
+      const asset = assetMap.get(key)!;
+      asset.count++;
+    }
+    
+    // Sort by count and get top 10 most traded assets
+    stats.mostTradedAssets = Array.from(assetMap.entries())
+      .map(([name, data]) => ({
+        issuer: name,
+        ticker: data.ticker,
+        transactionCount: data.count
+      }))
+      .sort((a, b) => b.transactionCount - a.transactionCount)
+      .slice(0, 10);
+    
+    return stats;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get politician stats: ${errorMessage}`);
+  }
+}
+
+/**
+ * Get asset statistics including trading breakdown and most active traders
+ */
+export async function getAssetStats(symbol: string, days: number) {
+  try {
+    // Get issuer ID
+    const issuerId = await getIssuerId(symbol);
+    
+    // Fetch all trades for this issuer
+    const url = `https://www.capitoltrades.com/trades?issuer=${issuerId}&txDate=${days}d`;
+    const trades = await scrapePoliticianTrades(url, 200);
+    
+    // Calculate statistics
+    const stats = {
+      symbol,
+      days,
+      totalTrades: trades.length,
+      buys: trades.filter(t => t.transaction.type?.toLowerCase() === 'buy').length,
+      sells: trades.filter(t => t.transaction.type?.toLowerCase() === 'sell').length,
+      receives: trades.filter(t => t.transaction.type?.toLowerCase() === 'receive').length,
+      exchanges: trades.filter(t => t.transaction.type?.toLowerCase() === 'exchange').length,
+      buySellRatio: 0, // Will calculate below
+      mostActiveTraders: [] as Array<{politician: string, party: string, chamber: string, transactionCount: number}>,
+    };
+    
+    // Calculate buy/sell ratio
+    if (stats.sells > 0) {
+      stats.buySellRatio = parseFloat((stats.buys / stats.sells).toFixed(2));
+    } else if (stats.buys > 0) {
+      stats.buySellRatio = stats.buys; // More buys than sells
+    }
+    
+    // Group all trades by politician to find most active traders
+    const politicianMap = new Map<string, { party: string, chamber: string, count: number }>();
+    
+    for (const trade of trades) {
+      // Count ALL transaction types (buy, sell, receive, exchange)
+      const key = trade.politician.name || "Unknown";
+      if (!politicianMap.has(key)) {
+        politicianMap.set(key, { 
+          party: trade.politician.party, 
+          chamber: trade.politician.chamber,
+          count: 0 
+        });
+      }
+      const politician = politicianMap.get(key)!;
+      politician.count++;
+    }
+    
+    // Sort by count and get top 10 most active traders
+    stats.mostActiveTraders = Array.from(politicianMap.entries())
+      .map(([name, data]) => ({
+        politician: name,
+        party: data.party,
+        chamber: data.chamber,
+        transactionCount: data.count
+      }))
+      .sort((a, b) => b.transactionCount - a.transactionCount)
+      .slice(0, 10);
+    
+    return stats;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get asset stats: ${errorMessage}`);
+  }
+}
+
+/**
+ * Get buy momentum assets - assets where politicians are net buyers
+ */
+export async function getBuyMomentumAssets(limit: number, days: number) {
+  try {
+    // Fetch all trades
+    const url = `https://www.capitoltrades.com/trades?txDate=${days}d`;
+    const trades = await scrapePoliticianTrades(url, 500);
+    
+    // Group by issuer and track buy vs sell activity
+    const assetMap = new Map<string, {
+      ticker: string,
+      buys: number,
+      sells: number,
+      totalTrades: number,
+      buySellRatio: number
+    }>();
+    
+    for (const trade of trades) {
+      const key = trade.issuer.name || "Unknown";
+      if (!assetMap.has(key)) {
+        assetMap.set(key, {
+          ticker: trade.issuer.ticker,
+          buys: 0,
+          sells: 0,
+          totalTrades: 0,
+          buySellRatio: 0
+        });
+      }
+      
+      const asset = assetMap.get(key)!;
+      asset.totalTrades++;
+      
+      const txType = trade.transaction.type?.toLowerCase();
+      if (txType === 'buy') asset.buys++;
+      if (txType === 'sell') asset.sells++;
+    }
+    
+    // Calculate buy/sell ratios and filter for net buyers (more buys than sells)
+    const buyMomentumAssets = Array.from(assetMap.entries())
+      .map(([name, data]) => {
+        data.buySellRatio = data.sells > 0 ? data.buys / data.sells : data.buys;
+        return { name, ...data };
+      })
+      .filter(asset => asset.buys > asset.sells) // Only net buyers
+      .sort((a, b) => {
+        // Sort by: (1) buy/sell ratio, (2) total buy volume
+        const ratioDiff = b.buySellRatio - a.buySellRatio;
+        return ratioDiff !== 0 ? ratioDiff : b.buys - a.buys;
+      })
+      .slice(0, limit)
+      .map((asset, index) => ({
+        rank: index + 1,
+        issuer: asset.name,
+        ticker: asset.ticker,
+        buys: asset.buys,
+        sells: asset.sells,
+        netBuys: asset.buys - asset.sells,
+        buySellRatio: parseFloat(asset.buySellRatio.toFixed(2)),
+        totalTransactions: asset.totalTrades
+      }));
+    
+    return {
+      limit,
+      days,
+      totalAssets: buyMomentumAssets.length,
+      disclaimer: "This shows assets where politicians are net buyers. Not investment advice.",
+      assets: buyMomentumAssets
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get buy momentum assets: ${errorMessage}`);
+  }
+}
+
+/**
+ * Get buy momentum broken down by political party
+ */
+export async function getPartyBuyMomentum(limit: number, days: number) {
+  try {
+    // Fetch all trades
+    const url = `https://www.capitoltrades.com/trades?txDate=${days}d`;
+    const trades = await scrapePoliticianTrades(url, 500);
+    
+    // Group by issuer and track buy/sell by party
+    const assetMap = new Map<string, {
+      ticker: string,
+      democrats: { buys: number, sells: number },
+      republicans: { buys: number, sells: number }
+    }>();
+    
+    for (const trade of trades) {
+      const key = trade.issuer.name || "Unknown";
+      const ticker = trade.issuer.ticker;
+      
+      if (!assetMap.has(key)) {
+        assetMap.set(key, {
+          ticker,
+          democrats: { buys: 0, sells: 0 },
+          republicans: { buys: 0, sells: 0 }
+        });
+      }
+      
+      const asset = assetMap.get(key)!;
+      const txType = trade.transaction.type?.toLowerCase();
+      const politician = trade.politician;
+      
+      // Check party from politician data
+      const partyLower = politician?.party?.toLowerCase() || '';
+      const isDemocrat = partyLower.includes('democrat');
+      const isRepublican = partyLower.includes('republican');
+      
+      if (txType === 'buy') {
+        if (isDemocrat) asset.democrats.buys++;
+        if (isRepublican) asset.republicans.buys++;
+      }
+      if (txType === 'sell') {
+        if (isDemocrat) asset.democrats.sells++;
+        if (isRepublican) asset.republicans.sells++;
+      }
+    }
+    
+    // Process into categories
+    const consensus: any[] = [];
+    const democratFavorites: any[] = [];
+    const republicanFavorites: any[] = [];
+    
+    for (const [name, data] of assetMap.entries()) {
+      const demNet = data.democrats.buys - data.democrats.sells;
+      const repNet = data.republicans.buys - data.republicans.sells;
+      const demTotal = data.democrats.buys + data.democrats.sells;
+      const repTotal = data.republicans.buys + data.republicans.sells;
+      
+      // Consensus: both parties are net buyers and have significant activity
+      if (demNet > 0 && repNet > 0 && demTotal >= 2 && repTotal >= 2) {
+        consensus.push({
+          issuer: name,
+          ticker: data.ticker,
+          democrats: {
+            buys: data.democrats.buys,
+            sells: data.democrats.sells,
+            netBuys: demNet
+          },
+          republicans: {
+            buys: data.republicans.buys,
+            sells: data.republicans.sells,
+            netBuys: repNet
+          },
+          score: demNet + repNet // Total net buys across both parties
+        });
+      }
+      
+      // Democrat favorites: net buyers, more activity from Democrats
+      if (demNet > 0 && demTotal >= repTotal) {
+        democratFavorites.push({
+          issuer: name,
+          ticker: data.ticker,
+          democrats: {
+            buys: data.democrats.buys,
+            sells: data.democrats.sells,
+            netBuys: demNet
+          },
+          republicans: {
+            buys: data.republicans.buys,
+            sells: data.republicans.sells,
+            netBuys: repNet
+          },
+          score: demNet
+        });
+      }
+      
+      // Republican favorites: net buyers, more activity from Republicans
+      if (repNet > 0 && repTotal >= demTotal) {
+        republicanFavorites.push({
+          issuer: name,
+          ticker: data.ticker,
+          democrats: {
+            buys: data.democrats.buys,
+            sells: data.democrats.sells,
+            netBuys: demNet
+          },
+          republicans: {
+            buys: data.republicans.buys,
+            sells: data.republicans.sells,
+            netBuys: repNet
+          },
+          score: repNet
+        });
+      }
+    }
+    
+    // Sort each category by score
+    consensus.sort((a, b) => b.score - a.score);
+    democratFavorites.sort((a, b) => b.score - a.score);
+    republicanFavorites.sort((a, b) => b.score - a.score);
+    
+    return {
+      limit,
+      days,
+      disclaimer: "This shows assets where politicians are net buyers. Not investment advice.",
+      consensus: consensus.slice(0, limit).map((asset, idx) => ({
+        rank: idx + 1,
+        ...asset
+      })),
+      democratFavorites: democratFavorites.slice(0, limit).map((asset, idx) => ({
+        rank: idx + 1,
+        ...asset
+      })),
+      republicanFavorites: republicanFavorites.slice(0, limit).map((asset, idx) => ({
+        rank: idx + 1,
+        ...asset
+      }))
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get party buy momentum: ${errorMessage}`);
   }
 }
 

@@ -24,17 +24,13 @@
 │  │  └────────────────────────────────────────────────────┘  │  │
 │  │                                                            │  │
 │  │  ┌────────────────────────────────────────────────────┐  │  │
-│  │  │  Tool Registry (1 specialized tool)                │  │  │
-│  │  │                                                     │  │  │
-  │  │  │  get_politician_trades                             │  │  │
-  │  │  │     ├─ Stock filter (optional)                      │  │  │
-  │  │  │     ├─ Politician filter (optional)                │  │  │
-  │  │  │     ├─ Party filter (DEMOCRAT/REPUBLICAN)          │  │  │
-  │  │  │     ├─ Type filter (BUY/SELL/RECEIVE/EXCHANGE)      │  │  │
-  │  │  │     ├─ Days filter (30, 90, 180, 365)              │  │  │
-  │  │  │     ├─ Searches Capitol Trades /trades endpoint    │  │  │
-  │  │  │     ├─ Paginates through results                   │  │  │
-  │  │  │     └─ Returns trade data (up to 50 trades)         │  │  │
+│  │  │  Tool Registry (6 tools)                            │  │  │
+│  │  │  • get_politician_trades - Trade filtering          │  │  │
+│  │  │  • get_top_traded_stocks - Most traded assets       │  │  │
+│  │  │  • get_politician_stats - Politician analytics      │  │  │
+│  │  │  • get_asset_stats - Asset-level analytics          │  │  │
+│  │  │  • get_buy_momentum_assets - Buy momentum ranking   │  │  │
+│  │  │  • get_party_buy_momentum - Party-based analysis     │  │  │
 │  │  └────────────────────────────────────────────────────┘  │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                  │
@@ -44,13 +40,13 @@
   │  │  │  Politician Trade Scraping                        │ │  │
   │  │  │                                                    │ │  │
   │  │  │  • scrapePoliticianTrades(url, limit)              │ │  │
-  │  │  │    ├─ Uses Cheerio for static HTML parsing        │ │  │
-  │  │  │    ├─ Supports pagination (up to 50 trades)         │ │  │
-  │  │  │    ├─ Extracts politician names                    │ │  │
-  │  │  │    ├─ Extracts transaction type (buy/sell)         │ │  │
-  │  │  │    ├─ Extracts size ranges                         │ │  │
-  │  │  │    ├─ Extracts dates                               │ │  │
-  │  │  │    └─ Returns structured trade data                │ │  │
+  │  │  │  • getIssuerId(symbol) - Lookup issuer IDs         │ │  │
+  │  │  │  • getPoliticianId(name) - Lookup politician IDs  │ │  │
+  │  │  │  • getTopTradedStocks(limit, days)                │ │  │
+  │  │  │  • getPoliticianStats(politician, days)           │ │  │
+  │  │  │  • getAssetStats(symbol, days)                     │ │  │
+  │  │  │  • getBuyMomentumAssets(limit, days)               │ │  │
+  │  │  │  • getPartyBuyMomentum(limit, days)                │ │  │
   │  │  └────────────────────────────────────────────────────┘ │  │
   │  └──────────────────────────────────────────────────────────┘  │
   │                                                                  │
@@ -91,10 +87,10 @@
           ↓
 2. Claude Desktop sends MCP request
    {
-     "method": "tools/call",
-     "params": {
+   "method": "tools/call",
+   "params": {
        "name": "get_politician_trades",
-       "arguments": {"stock": "Apple", "days": 90}
+       "arguments": {"symbol": "Apple", "days": 90}
      }
    }
           ↓
@@ -145,64 +141,22 @@
 ## Component Details
 
 ### 1. MCP Server Core (`index.ts`)
-
-**Responsibilities:**
-- Initialize MCP server instance
-- Register tool definitions
-- Handle tool execution requests
-- Error handling and formatting
-- Response serialization
-
-**Key Functions:**
-- `server.setRequestHandler(ListToolsRequestSchema, ...)` - Lists available tools
-- `server.setRequestHandler(CallToolRequestSchema, ...)` - Executes tool calls
-- `getPoliticianTrades()` - Main tool handler
-- `main()` - Server initialization
+- Registers 6 tools
+- Handles tool execution and validation
+- Error handling and response formatting
 
 ### 2. Politician Trades Scraper (`politician-trades-scraper.ts`)
-
-**Responsibilities:**
-- Dynamic content loading with Playwright
-- Politician trade data extraction
-- Transaction type parsing (buy/sell)
-- Price and size extraction
-- Date parsing
-
-**Key Functions:**
-- `scrapePoliticianTrades()` - Main trade extraction with pagination
-- `scrapePoliticianTradesSinglePage()` - Single page scraper
-- Extracts trade table data
-- Parses politician information
-- Validates empty rows
-
-**Dependencies:**
-- `axios` - HTTP client
-- `cheerio` - HTML parsing
+- Core scraping with Cheerio for static HTML
+- Pagination support (up to 500 trades)
+- ID lookups for issuers and politicians
+- Analytics functions (stats, momentum, rankings)
 
 ### 3. Web Scraper (`web-scraper.ts`)
-
-**Responsibilities:**
-- Link finding and filtering
-- URL construction
-- Basic web requests
-
-**Key Functions:**
-- `findLink()` - Finds links matching a predicate
-- URL normalization
-
-**Dependencies:**
-- `axios` - HTTP client
-- `cheerio` - HTML parsing
+- Link extraction and filtering
+- URL helpers
 
 ### 4. Type Definitions (`types.ts`)
-
-**Responsibilities:**
-- TypeScript type definitions
-- Interface definitions for data structures
-
-**Key Types:**
-- `Politician`, `Issuer`, `Transaction`, `Trade` types
-- Structured data for trade information
+- TypeScript interfaces for trades, politicians, issuers
 
 ## Technology Stack Details
 
