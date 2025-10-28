@@ -5,7 +5,7 @@
  * Run with: npx tsx test/test-scraper.ts
  */
 
-import { scrapePoliticianTrades, getIssuerId, getPoliticianId } from "../src/scraper.js";
+import { scrapePoliticianTrades, getIssuerId, getPoliticianId, getTopTradedStocks, getPoliticianStats, getAssetStats, getBuyMomentumAssets, getPartyBuyMomentum } from "../src/scraper.js";
 
 async function testGetIssuerId() {
   console.log("\n🧪 Testing Get Issuer ID\n");
@@ -45,6 +45,59 @@ async function testGetPoliticianId() {
   }
 
   console.log("\n" + "=".repeat(60));
+}
+
+async function testGetTopTradedStocks() {
+  console.log("\n🧪 Testing Get Top Traded Stocks\n");
+  console.log("=".repeat(60));
+
+  try {
+    console.log("\n📝 Test 1: Top 10 stocks in the last 90 days");
+    
+    const result = await getTopTradedStocks(10, 90);
+    console.log(`✓ Found ${result.totalStocks} unique stocks with trading activity`);
+    console.log("\n📊 Top Traded Stocks:");
+    result.stocks.forEach((stock, index) => {
+      console.log(`${index + 1}. ${stock.issuer} (${stock.ticker}) - ${stock.tradeCount} trades`);
+    });
+    
+    console.log("\n" + "=".repeat(60));
+  } catch (error) {
+    console.error("❌ Error:", error instanceof Error ? error.message : error);
+    throw error;
+  }
+}
+
+async function testGetPoliticianStats() {
+  console.log("\n🧪 Testing Get Politician Stats\n");
+  console.log("=".repeat(60));
+
+  try {
+    console.log("\n📝 Test: Nancy Pelosi stats (90 days)");
+    
+    const result = await getPoliticianStats("Nancy Pelosi", 365);
+    
+    console.log(`\n✓ Total Trades: ${result.totalTrades}`);
+    console.log(`✓ Buys: ${result.buys}`);
+    console.log(`✓ Sells: ${result.sells}`);
+    console.log(`✓ Receives: ${result.receives}`);
+    console.log(`✓ Exchanges: ${result.exchanges}`);
+    console.log(`✓ Buy/Sell Ratio: ${result.buySellRatio}`);
+    
+    if (result.mostTradedAssets.length > 0) {
+      console.log("\n📊 Most Traded Assets:");
+      result.mostTradedAssets.forEach((asset, index) => {
+        console.log(`${index + 1}. ${asset.issuer} (${asset.ticker}) - ${asset.transactionCount} transactions`);
+      });
+    } else {
+      console.log("\n⚠️ No trades found in this time period");
+    }
+    
+    console.log("\n" + "=".repeat(60));
+  } catch (error) {
+    console.error("❌ Error:", error instanceof Error ? error.message : error);
+    throw error;
+  }
 }
 
 async function testGetPoliticianTrades() {
@@ -134,15 +187,141 @@ async function testGetPoliticianTrades() {
   }
 }
 
+async function testGetAssetStats() {
+  console.log("\n🧪 Testing Get Asset Stats\n");
+  console.log("=".repeat(60));
+
+  try {
+    console.log("\n📝 Test: Apple stats (90 days)");
+    
+    const result = await getAssetStats("Apple", 90);
+    
+    console.log(`\n✓ Asset: ${result.symbol}`);
+    console.log(`✓ Total Trades: ${result.totalTrades}`);
+    console.log(`✓ Buys: ${result.buys}`);
+    console.log(`✓ Sells: ${result.sells}`);
+    console.log(`✓ Receives: ${result.receives}`);
+    console.log(`✓ Exchanges: ${result.exchanges}`);
+    console.log(`✓ Buy/Sell Ratio: ${result.buySellRatio}`);
+    
+    if (result.mostActiveTraders.length > 0) {
+      console.log("\n📊 Most Active Traders:");
+      result.mostActiveTraders.forEach((trader, index) => {
+        console.log(`${index + 1}. ${trader.politician} (${trader.party}, ${trader.chamber}) - ${trader.transactionCount} transactions`);
+      });
+    } else {
+      console.log("\n⚠️ No trades found in this time period");
+    }
+    
+    console.log("\n" + "=".repeat(60));
+  } catch (error) {
+    console.error("❌ Error:", error instanceof Error ? error.message : error);
+    throw error;
+  }
+}
+
+async function testGetBuyMomentumAssets() {
+  console.log("\n🧪 Testing Get Buy Momentum Assets\n");
+    console.log("=".repeat(60));
+
+  try {
+    console.log("\n📝 Test: Top 10 buy momentum assets (90 days)");
+    
+    const result = await getBuyMomentumAssets(10, 90);
+    
+    console.log(`\n✓ Found ${result.totalAssets} assets with net buy activity`);
+    console.log(`⚠️  ${result.disclaimer}`);
+    
+    if (result.assets.length > 0) {
+      console.log("\n📊 Top Buy Momentum Assets:");
+      result.assets.forEach((asset) => {
+        console.log(`${asset.rank}. ${asset.issuer} (${asset.ticker})`);
+        console.log(`   - Buys: ${asset.buys} | Sells: ${asset.sells} | Net Buys: ${asset.netBuys}`);
+        console.log(`   - Buy/Sell Ratio: ${asset.buySellRatio} | Total Transactions: ${asset.totalTransactions}`);
+      });
+    } else {
+      console.log("\n⚠️ No assets with net buy activity found");
+    }
+    
+    console.log("\n" + "=".repeat(60));
+  } catch (error) {
+    console.error("❌ Error:", error instanceof Error ? error.message : error);
+    throw error;
+  }
+}
+
+async function testGetPartyBuyMomentum() {
+  console.log("\n🧪 Testing Get Party Buy Momentum\n");
+  console.log("=".repeat(60));
+
+  try {
+    console.log("\n📝 Test: Party buy momentum breakdown (90 days)");
+    
+    const result = await getPartyBuyMomentum(5, 90);
+    
+    console.log(`\n⚠️  ${result.disclaimer}`);
+    
+    // Consensus assets
+    if (result.consensus.length > 0) {
+      console.log("\n🤝 CONSENSUS ASSETS (Both parties buying):");
+      result.consensus.forEach((asset: any) => {
+        console.log(`${asset.rank}. ${asset.issuer} (${asset.ticker})`);
+        console.log(`   Democrats: ${asset.democrats.buys} buys, ${asset.democrats.sells} sells (net: ${asset.democrats.netBuys})`);
+        console.log(`   Republicans: ${asset.republicans.buys} buys, ${asset.republicans.sells} sells (net: ${asset.republicans.netBuys})`);
+      });
+    } else {
+      console.log("\n🤝 No consensus assets found");
+    }
+    
+    // Democrat favorites
+    if (result.democratFavorites.length > 0) {
+      console.log("\n🔵 DEMOCRAT FAVORITES:");
+      result.democratFavorites.forEach((asset: any) => {
+        console.log(`${asset.rank}. ${asset.issuer} (${asset.ticker})`);
+        console.log(`   Democrats: ${asset.democrats.buys} buys, ${asset.democrats.sells} sells (net: ${asset.democrats.netBuys})`);
+        if (asset.republicans.buys + asset.republicans.sells > 0) {
+          console.log(`   Republicans: ${asset.republicans.buys} buys, ${asset.republicans.sells} sells (net: ${asset.republicans.netBuys})`);
+        }
+      });
+    } else {
+      console.log("\n🔵 No Democrat favorites found");
+    }
+    
+    // Republican favorites
+    if (result.republicanFavorites.length > 0) {
+      console.log("\n🔴 REPUBLICAN FAVORITES:");
+      result.republicanFavorites.forEach((asset: any) => {
+        console.log(`${asset.rank}. ${asset.issuer} (${asset.ticker})`);
+        console.log(`   Republicans: ${asset.republicans.buys} buys, ${asset.republicans.sells} sells (net: ${asset.republicans.netBuys})`);
+        if (asset.democrats.buys + asset.democrats.sells > 0) {
+          console.log(`   Democrats: ${asset.democrats.buys} buys, ${asset.democrats.sells} sells (net: ${asset.democrats.netBuys})`);
+        }
+      });
+    } else {
+      console.log("\n🔴 No Republican favorites found");
+    }
+    
+    console.log("\n" + "=".repeat(60));
+  } catch (error) {
+    console.error("❌ Error:", error instanceof Error ? error.message : error);
+    throw error;
+  }
+}
+
 // Run tests
 async function runTests() {
   try {
-    await testGetIssuerId();
     await testGetPoliticianId();
+    await testGetIssuerId();
+    await testGetTopTradedStocks();
+    await testGetPoliticianStats();
+    await testGetAssetStats();
+    await testGetBuyMomentumAssets();
+    await testGetPartyBuyMomentum();
     await testGetPoliticianTrades();
   } catch (error) {
-    console.error("Fatal error:", error);
-    process.exit(1);
+  console.error("Fatal error:", error);
+  process.exit(1);
   }
 }
 

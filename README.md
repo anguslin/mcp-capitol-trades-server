@@ -4,13 +4,11 @@ A Model Context Protocol (MCP) server that extracts politician stock trades with
 
 ## Features
 
-- 🌐 Web scraping with CSS selector support
-- 🔗 Link extraction and filtering
-- 🏛️ **Politician trade data extraction from Capitol Trades**
-- 💰 Financial data extraction (prices, percentages)
-- 📊 Table data parsing
-- 🚀 Easy to integrate with Claude Desktop and Cursor
-- 📦 Packaged as npm module for easy distribution
+- 🔍 **Politician trade data extraction** with prices and details
+- 📊 **Analytics tools**: Top traded stocks, buy momentum, party analysis
+- 🎯 **Advanced filtering** by stock, politician, party, transaction type
+- 💰 Real-time price and transaction data
+- 🚀 Easy integration with Claude Desktop and Cursor
 
 ## Quick Start
 
@@ -98,36 +96,19 @@ Extract politician stock trades with advanced filtering options.
 Get politician stock trades with price information from Capitol Trades. Searches for a stock by ticker or company name and returns recent trades by politicians.
 
 **Parameters:**
-- `stock` (optional): The stock ticker symbol or company name (e.g., 'Apple', 'AAPL', 'Microsoft')
-- `politician` (optional): The politician name to search for (e.g., 'Michael', 'Nancy Pelosi')
-- `party` (optional): Filter by party - "DEMOCRAT" or "REPUBLICAN"
-- `type` (optional): Array of transaction types - ["BUY", "SELL", "RECEIVE", "EXCHANGE"]
-- `days` (optional): Number of days to look back - must be 30, 90, 180, or 365 (default: 90)
+- `symbol` (optional): Asset ticker or name (e.g., 'Apple', 'AAPL', 'VOO')
+- `politician` (optional): Politician name (e.g., 'Nancy Pelosi')
+- `party` (optional): "DEMOCRAT" or "REPUBLICAN"
+- `type` (optional): Array - ["BUY", "SELL", "RECEIVE", "EXCHANGE"]
+- `days` (optional): 30, 90, 180, or 365 (default: 90)
 
-**Example Request 1 - Filter by stock:**
-```json
-{
-  "stock": "Apple",
-  "days": 90
-}
-```
+### Additional Tools
 
-**Example Request 2 - Filter by politician:**
-```json
-{
-  "politician": "Nancy Pelosi",
-  "days": 180
-}
-```
-
-**Example Request 3 - Filter by party and type:**
-```json
-{
-  "party": "DEMOCRAT",
-  "type": ["BUY", "SELL"],
-  "days": 90
-}
-```
+- **`get_top_traded_stocks`** - Most traded assets by politicians
+- **`get_politician_stats`** - Individual politician trading stats
+- **`get_asset_stats`** - Asset-level trading statistics
+- **`get_buy_momentum_assets`** - Assets with strong buy momentum
+- **`get_party_buy_momentum`** - Buy activity by political party
 
 **Returns:**
 ```json
@@ -167,31 +148,26 @@ Get politician stock trades with price information from Capitol Trades. Searches
 
 ### Example Prompts
 
-**Basic Usage:**
+**Basic Queries:**
 ```
-"Get politician trades for Microsoft in the last 90 days"
-"What trades did politicians make in Apple stock recently?"
-"Show me all Tesla trades by politicians in the last 180 days"
-"Show me all Democrat buys in the last 90 days"
-"Get all trades by Nancy Pelosi in the last 365 days"
-"What Republican sells happened in the last 30 days?"
+"Show me all politician trades for Apple"
+"What did Nancy Pelosi trade recently?"
+"Get Democrat buys in the last 90 days"
 ```
 
-**Analysis Queries:**
+**Analytics Queries:**
 ```
-"Get politician trades for Microsoft and show me who bought, who sold, and at what prices"
-"Find all Tesla trades by Democrats and Republicans separately. Which party has more trades?"
-"Show me all politician trades in Apple during the last quarter (90 days) with prices"
-"Get trades for both Google and Microsoft in the last 180 days. Which stock has more politician activity?"
+"What stocks are politicians buying the most?"
+"Show me assets with strong buy momentum"
+"What are Democrats vs Republicans buying?"
+"Get detailed stats for Nancy Pelosi's trading"
 ```
 
-### Usage Tips
+### Tips
 
-1. **Use specific stock names:** Search by company name (e.g., "Apple") or ticker (e.g., "AAPL")
-2. **Time period options:** Choose from 30, 90, 180, or 365 days
-3. **Price information:** The tool extracts actual trade prices from Capitol Trades
-4. **Complete data:** Each trade includes politician info, dates, transaction type, size, and price
-5. **Multiple trades:** The tool returns all matching trades for the stock and time period
+- Search by company name or ticker (e.g., "Apple" or "AAPL")
+- Supports ETFs and bonds too (e.g., "VOO", "VBTLX")
+- All parameters are optional for flexible queries
 
 ## Development
 

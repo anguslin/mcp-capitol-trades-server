@@ -10,7 +10,7 @@ import {
 export * from "./types.js";
 
 // Import the trade parsing functions
-import { scrapePoliticianTrades, getIssuerId, getPoliticianId } from "./politician-trades-scraper.js";
+import { scrapePoliticianTrades, getIssuerId, getPoliticianId, getTopTradedStocks, getPoliticianStats, getAssetStats, getBuyMomentumAssets, getPartyBuyMomentum } from "./politician-trades-scraper.js";
 
 /**
  * MCP Capitol Trades Server
@@ -20,15 +20,123 @@ import { scrapePoliticianTrades, getIssuerId, getPoliticianId } from "./politici
 // Define available tools
 const TOOLS: Tool[] = [
   {
+    name: "get_top_traded_stocks",
+    description:
+      "Get the most traded stocks by politicians over a time period, ranked by number of trades.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "number",
+          description: "Number of top stocks to return (default: 10, max: 50)",
+          default: 10,
+        },
+        days: {
+          type: "number",
+          enum: [30, 90, 180, 365],
+          description: "Number of days to look back for trades. Must be one of: 30, 90, 180, or 365 days",
+          default: 90,
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_politician_stats",
+    description:
+      "Get comprehensive statistics for a specific politician including total trades, buy/sell ratio, top holdings, and trading activity breakdown.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        politician: {
+          type: "string",
+          description: "The politician name to search for (e.g., 'Nancy Pelosi', 'Michael').",
+        },
+        days: {
+          type: "number",
+          enum: [30, 90, 180, 365],
+          description: "Number of days to look back for trades. Must be one of: 30, 90, 180, or 365 days",
+          default: 90,
+        },
+      },
+      required: ["politician"],
+    },
+  },
+  {
+    name: "get_asset_stats",
+    description:
+      "Get comprehensive statistics for a specific asset (stock, ETF, bond, etc.) including total trades, buy/sell ratio, most active traders, and trading activity breakdown.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        symbol: {
+          type: "string",
+          description: "The ticker symbol or company/asset name (e.g., 'Apple', 'AAPL', 'VOO', 'Microsoft').",
+        },
+        days: {
+          type: "number",
+          enum: [30, 90, 180, 365],
+          description: "Number of days to look back for trades. Must be one of: 30, 90, 180, or 365 days",
+          default: 90,
+        },
+      },
+      required: ["symbol"],
+    },
+  },
+  {
+    name: "get_buy_momentum_assets",
+    description:
+      "Get assets with high buy momentum from politician trading activity. Shows assets where politicians are net buyers (more buys than sells) with scoring based on volume and conviction.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "number",
+          description: "Number of top assets to return (default: 10, max: 50)",
+          default: 10,
+        },
+        days: {
+          type: "number",
+          enum: [30, 90, 180, 365],
+          description: "Number of days to look back for trades. Must be one of: 30, 90, 180, or 365 days",
+          default: 90,
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_party_buy_momentum",
+    description:
+      "Get buy momentum broken down by political party. Shows consensus assets (both parties buying), Democrat favorites, and Republican favorites with detailed buy/sell breakdowns.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "number",
+          description: "Number of top assets per category to return (default: 5, max: 20)",
+          default: 5,
+        },
+        days: {
+          type: "number",
+          enum: [30, 90, 180, 365],
+          description: "Number of days to look back for trades. Must be one of: 30, 90, 180, or 365 days",
+          default: 90,
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_politician_trades",
     description:
       "Get politician trades with advanced filters. Filter by issuer, politician, party, transaction type, and time period.",
     inputSchema: {
       type: "object",
       properties: {
-        stock: {
+        symbol: {
           type: "string",
-          description: "Optional: The stock ticker symbol or company name (e.g., 'Apple', 'AAPL'). If provided, filters trades for that stock.",
+          description: "Optional: The ticker symbol or company/asset name (e.g., 'Apple', 'AAPL', 'VOO'). If provided, filters trades for that asset.",
         },
         politician: {
           type: "string",
@@ -91,7 +199,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     switch (name) {
       case "get_politician_trades": {
-        const stock = args.stock as string | null;
+        const symbol = args.symbol as string | null;
         const politician = args.politician as string | null;
         // Normalize party: undefined or null both become null
         const party = args.party === undefined || args.party === null ? null : (args.party as string);
@@ -122,7 +230,140 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        const result = await getPoliticianTrades(stock, politician, party, type, days);
+        const result = await getPoliticianTrades(symbol, politician, party, type, days);
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "get_top_traded_stocks": {
+        const limit = (args.limit as number) || 10;
+        const days = (args.days as number) || 90;
+
+        // Validate that days is one of the allowed values
+        const allowedDays = [30, 90, 180, 365];
+        if (!allowedDays.includes(days)) {
+          throw new Error(`days must be one of: ${allowedDays.join(', ')}`);
+        }
+
+        // Validate limit
+        if (limit < 1 || limit > 50) {
+          throw new Error(`limit must be between 1 and 50`);
+        }
+
+        const result = await getTopTradedStocks(limit, days);
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "get_politician_stats": {
+        const politician = args.politician as string;
+        const days = (args.days as number) || 90;
+
+        if (!politician) {
+          throw new Error("politician is required");
+        }
+
+        // Validate that days is one of the allowed values
+        const allowedDays = [30, 90, 180, 365];
+        if (!allowedDays.includes(days)) {
+          throw new Error(`days must be one of: ${allowedDays.join(', ')}`);
+        }
+
+        const result = await getPoliticianStats(politician, days);
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "get_asset_stats": {
+        const symbol = args.symbol as string;
+        const days = (args.days as number) || 90;
+
+        if (!symbol) {
+          throw new Error("symbol is required");
+        }
+
+        // Validate that days is one of the allowed values
+        const allowedDays = [30, 90, 180, 365];
+        if (!allowedDays.includes(days)) {
+          throw new Error(`days must be one of: ${allowedDays.join(', ')}`);
+        }
+
+        const result = await getAssetStats(symbol, days);
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "get_buy_momentum_assets": {
+        const limit = (args.limit as number) || 10;
+        const days = (args.days as number) || 90;
+
+        // Validate that days is one of the allowed values
+        const allowedDays = [30, 90, 180, 365];
+        if (!allowedDays.includes(days)) {
+          throw new Error(`days must be one of: ${allowedDays.join(', ')}`);
+        }
+
+        // Validate limit
+        if (limit < 1 || limit > 50) {
+          throw new Error(`limit must be between 1 and 50`);
+        }
+
+        const result = await getBuyMomentumAssets(limit, days);
+        
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "get_party_buy_momentum": {
+        const limit = (args.limit as number) || 5;
+        const days = (args.days as number) || 90;
+
+        // Validate that days is one of the allowed values
+        const allowedDays = [30, 90, 180, 365];
+        if (!allowedDays.includes(days)) {
+          throw new Error(`days must be one of: ${allowedDays.join(', ')}`);
+        }
+
+        // Validate limit
+        if (limit < 1 || limit > 20) {
+          throw new Error(`limit must be between 1 and 20`);
+        }
+
+        const result = await getPartyBuyMomentum(limit, days);
         
         return {
           content: [
@@ -155,7 +396,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
  * Get politician trades with advanced filters
  */
 async function getPoliticianTrades(
-  stock: string | null,
+  symbol: string | null,
   politician: string | null,
   party: string | null,
   type: string[],
@@ -165,9 +406,9 @@ async function getPoliticianTrades(
     const baseUrl = "https://www.capitoltrades.com/trades";
     const params: string[] = [];
 
-    // Get issuer ID if stock is provided
-    if (stock) {
-      const issuerId = await getIssuerId(stock);
+    // Get issuer ID if symbol is provided
+    if (symbol) {
+      const issuerId = await getIssuerId(symbol);
       params.push(`issuer=${issuerId}`);
     }
 
@@ -207,7 +448,7 @@ async function getPoliticianTrades(
     
     return {
       filters: {
-        stock: stock || null,
+        symbol: symbol || null,
         politician: politician || null,
         party: party || "ALL",
         type: type.length === 0 || hasAllTypes ? "ALL" : type,
