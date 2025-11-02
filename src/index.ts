@@ -10,7 +10,7 @@ import {
 export * from "./types.js";
 
 // Import the trade parsing functions
-import { scrapePoliticianTrades, getIssuerId, getPoliticianId, getTopTradedStocks, getPoliticianStats, getAssetStats, getBuyMomentumAssets, getPartyBuyMomentum } from "./politician-trades-scraper.js";
+import { scrapePoliticianTrades, getIssuerId, getPoliticianId, getTopTradedAssets, getPoliticianStats, getAssetStats, getBuyMomentumAssets, getPartyBuyMomentum } from "./politician-trades-scraper.js";
 
 /**
  * MCP Capitol Trades Server
@@ -20,15 +20,15 @@ import { scrapePoliticianTrades, getIssuerId, getPoliticianId, getTopTradedStock
 // Define available tools
 const TOOLS: Tool[] = [
   {
-    name: "get_top_traded_stocks",
+    name: "get_top_traded_assets",
     description:
-      "Get the most traded stocks by politicians over a time period, ranked by number of trades.",
+      "Get the most traded assets (stocks, ETFs, mutual funds, bonds) by politicians over a time period, ranked by number of trades.",
     inputSchema: {
       type: "object",
       properties: {
         limit: {
           type: "number",
-          description: "Number of top stocks to return (default: 10, max: 50)",
+          description: "Number of top assets to return (default: 10, max: 50)",
           default: 10,
         },
         days: {
@@ -65,7 +65,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_asset_stats",
     description:
-      "Get comprehensive statistics for a specific asset (stock, ETF, bond, etc.) including total trades, buy/sell ratio, most active traders, and trading activity breakdown.",
+      "Get comprehensive statistics for a specific asset (stock, ETF, mutual fund, bond) including total trades, buy/sell ratio, most active traders, and trading activity breakdown.",
     inputSchema: {
       type: "object",
       properties: {
@@ -86,7 +86,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_buy_momentum_assets",
     description:
-      "Get assets with high buy momentum from politician trading activity. Shows assets where politicians are net buyers (more buys than sells) with scoring based on volume and conviction.",
+      "Get assets (stocks, ETFs, mutual funds, bonds) with high buy momentum from politician trading activity. Shows assets where politicians are net buyers (more buys than sells) with scoring based on volume and conviction.",
     inputSchema: {
       type: "object",
       properties: {
@@ -108,7 +108,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_party_buy_momentum",
     description:
-      "Get buy momentum broken down by political party. Shows consensus assets (both parties buying), Democrat favorites, and Republican favorites with detailed buy/sell breakdowns.",
+      "Get buy momentum broken down by political party. Shows consensus assets (stocks, ETFs, mutual funds, bonds) where both parties are buying, Democrat favorites, and Republican favorites with detailed buy/sell breakdowns.",
     inputSchema: {
       type: "object",
       properties: {
@@ -242,7 +242,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "get_top_traded_stocks": {
+      case "get_top_traded_assets": {
         const limit = (args.limit as number) || 10;
         const days = (args.days as number) || 90;
 
@@ -257,7 +257,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error(`limit must be between 1 and 50`);
         }
 
-        const result = await getTopTradedStocks(limit, days);
+        const result = await getTopTradedAssets(limit, days);
         
         return {
           content: [

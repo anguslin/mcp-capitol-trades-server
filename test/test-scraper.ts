@@ -5,7 +5,7 @@
  * Run with: npx tsx test/test-scraper.ts
  */
 
-import { scrapePoliticianTrades, getIssuerId, getPoliticianId, getTopTradedStocks, getPoliticianStats, getAssetStats, getBuyMomentumAssets, getPartyBuyMomentum } from "../src/scraper.js";
+import { scrapePoliticianTrades, getIssuerId, getPoliticianId, getTopTradedAssets, getPoliticianStats, getAssetStats, getBuyMomentumAssets, getPartyBuyMomentum } from "../src/scraper.js";
 
 async function testGetIssuerId() {
   console.log("\n🧪 Testing Get Issuer ID\n");
@@ -47,18 +47,18 @@ async function testGetPoliticianId() {
   console.log("\n" + "=".repeat(60));
 }
 
-async function testGetTopTradedStocks() {
-  console.log("\n🧪 Testing Get Top Traded Stocks\n");
+async function testGetTopTradedAssets() {
+  console.log("\n🧪 Testing Get Top Traded Assets\n");
   console.log("=".repeat(60));
 
   try {
-    console.log("\n📝 Test 1: Top 10 stocks in the last 90 days");
+    console.log("\n📝 Test 1: Top 10 assets in the last 90 days");
     
-    const result = await getTopTradedStocks(10, 90);
-    console.log(`✓ Found ${result.totalStocks} unique stocks with trading activity`);
-    console.log("\n📊 Top Traded Stocks:");
-    result.stocks.forEach((stock, index) => {
-      console.log(`${index + 1}. ${stock.issuer} (${stock.ticker}) - ${stock.tradeCount} trades`);
+    const result = await getTopTradedAssets(10, 90);
+    console.log(`✓ Found ${result.totalAssets} unique assets with trading activity`);
+    console.log("\n📊 Top Traded Assets:");
+    result.assets.forEach((asset, index) => {
+      console.log(`${index + 1}. ${asset.issuer} (${asset.ticker}) - ${asset.tradeCount} trades`);
     });
     
     console.log("\n" + "=".repeat(60));
@@ -108,9 +108,9 @@ async function testGetPoliticianTrades() {
     // Test 1: Filter by stock only
     console.log("\n📝 Test 1: Filter by stock (Apple)");
     
-    const stock = "Apple";
-    const days = 90;
-    
+  const stock = "Apple";
+  const days = 90;
+  
     // Get issuer ID
     console.log(`Getting issuer ID for: ${stock}`);
     const issuerId = await getIssuerId(stock);
@@ -252,7 +252,7 @@ async function testGetBuyMomentumAssets() {
 
 async function testGetPartyBuyMomentum() {
   console.log("\n🧪 Testing Get Party Buy Momentum\n");
-  console.log("=".repeat(60));
+    console.log("=".repeat(60));
 
   try {
     console.log("\n📝 Test: Party buy momentum breakdown (90 days)");
@@ -313,7 +313,7 @@ async function runTests() {
   try {
     await testGetPoliticianId();
     await testGetIssuerId();
-    await testGetTopTradedStocks();
+    await testGetTopTradedAssets();
     await testGetPoliticianStats();
     await testGetAssetStats();
     await testGetBuyMomentumAssets();

@@ -11,7 +11,7 @@ const logDebug = (...args: any[]) => {
   }
 };
 
-// Simple in-memory cache for ID lookups (avoids redundant web requests)
+// In-memory cache for ID lookups (avoids redundant web requests)
 const idCache = new Map<string, { id: string; timestamp: number }>();
 const CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 
@@ -327,40 +327,40 @@ export async function getPoliticianId(politician: string): Promise<string> {
 }
 
 /**
- * Get top traded stocks by politicians
+ * Get top traded assets by politicians
  */
-export async function getTopTradedStocks(limit: number, days: number) {
+export async function getTopTradedAssets(limit: number, days: number) {
   try {
     // Fetch all trades (no filters except days)
     const url = `https://www.capitoltrades.com/trades?txDate=${days}d`;
     
-    logDebug(`Fetching all trades for top stocks analysis`);
+    logDebug(`Fetching all trades for top assets analysis`);
     
     // Get all trades (will be limited by scrapePoliticianTrades)
     const trades = await scrapePoliticianTrades(url, 500); // Get more for better statistics
     
-    // Group trades by issuer (stock)
-    const stockCounts = new Map<string, { count: number; ticker: string; name: string }>();
+    // Group trades by issuer (asset)
+    const assetCounts = new Map<string, { count: number; ticker: string; name: string }>();
     
     for (const trade of trades) {
       const key = trade.issuer.name || "Unknown";
-      if (!stockCounts.has(key)) {
-        stockCounts.set(key, { 
+      if (!assetCounts.has(key)) {
+        assetCounts.set(key, { 
           count: 0, 
           ticker: trade.issuer.ticker,
           name: trade.issuer.name
         });
       }
-      const stock = stockCounts.get(key)!;
-      stock.count++;
+      const asset = assetCounts.get(key)!;
+      asset.count++;
       // Update ticker if available
       if (trade.issuer.ticker && trade.issuer.ticker !== "N/A") {
-        stock.ticker = trade.issuer.ticker;
+        asset.ticker = trade.issuer.ticker;
       }
     }
     
     // Convert to array, sort by count, and take top N
-    const sortedStocks = Array.from(stockCounts.entries())
+    const sortedAssets = Array.from(assetCounts.entries())
       .map(([name, data]) => ({
         issuer: name,
         ticker: data.ticker,
@@ -372,12 +372,12 @@ export async function getTopTradedStocks(limit: number, days: number) {
     return {
       limit,
       days,
-      totalStocks: sortedStocks.length,
-      stocks: sortedStocks
+      totalAssets: sortedAssets.length,
+      assets: sortedAssets
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to get top traded stocks: ${errorMessage}`);
+    throw new Error(`Failed to get top traded assets: ${errorMessage}`);
   }
 }
 

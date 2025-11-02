@@ -1,6 +1,6 @@
 # MCP Capitol Trades Server
 
-An open-source Model Context Protocol (MCP) server that extracts politician stock trades with prices from Capitol Trades. Get detailed trade information including politicians, dates, transaction types, sizes, and prices. No API Key required.
+A Model Context Protocol (MCP) server that extracts politician stock trades with prices from [Capitol Trades](https://www.capitoltrades.com/). Get detailed trade information including politicians, dates, transaction types, sizes, and prices. No API Key required.
 
 ## ✨ Why This MCP Server?
 
@@ -12,7 +12,7 @@ An open-source Model Context Protocol (MCP) server that extracts politician stoc
 
 ## Quick Start
 
-Get politician stock trades with prices from Capitol Trades. Simply ask Cursor or VS Code AI to get trades for any stock!
+Get politician stock trades with prices from [Capitol Trades](https://www.capitoltrades.com/). Simply ask Cursor or VS Code AI to get trades for any stock!
 
 **Example:** "Get politician trades for Microsoft in the last 90 days"
 
@@ -96,9 +96,20 @@ After restarting, you should see the MCP Capitol Trades server available in your
 
 ## Tools Provided
 
+| Tool | Description |
+|------|-------------|
+| `get_politician_trades` | Extract politician trades with advanced filtering options |
+| `get_top_traded_assets` | Get the most traded assets (stocks, ETFs, mutual funds, bonds) by politicians ranked by volume |
+| `get_politician_stats` | Get comprehensive statistics for a specific politician |
+| `get_asset_stats` | Get comprehensive statistics for a specific asset (stock, ETF, mutual fund, bond) |
+| `get_buy_momentum_assets` | Get assets (stocks, ETFs, mutual funds, bonds) with high buy momentum from politician activity |
+| `get_party_buy_momentum` | Get buy momentum broken down by political party for all asset types |
+
+---
+
 ### `get_politician_trades`
 
-Extract politician stock trades with advanced filtering options. Get detailed trade information including transaction types, sizes, and prices.
+Extract politician trades with advanced filtering options. Get detailed trade information including transaction types, sizes, and prices.
 
 **Parameters:**
 - `symbol` (optional): Asset ticker or name (e.g., 'Apple', 'AAPL', 'VOO')
@@ -118,19 +129,19 @@ Extract politician stock trades with advanced filtering options. Get detailed tr
 
 ---
 
-### `get_top_traded_stocks`
+### `get_top_traded_assets`
 
-Get the most traded stocks by politicians over a time period, ranked by number of trades.
+Get the most traded assets (stocks, ETFs, mutual funds, bonds) by politicians over a time period, ranked by number of trades.
 
 **Parameters:**
-- `limit` (optional): Number of top stocks to return (default: 10, max: 50)
+- `limit` (optional): Number of top assets to return (default: 10, max: 50)
 - `days` (optional): 30, 90, 180, or 365 (default: 90)
 
 **Example Prompts:**
 ```
-"What stocks are politicians trading the most?"
-"Show me the top 20 most traded stocks in the last 180 days"
-"What are the most popular stocks among politicians?"
+"What assets are politicians trading the most?"
+"Show me the top 20 most traded assets in the last 180 days"
+"What are the most popular assets among politicians?"
 ```
 
 ---
@@ -155,7 +166,7 @@ Get comprehensive statistics for a specific politician including total trades, b
 
 ### `get_asset_stats`
 
-Get comprehensive statistics for a specific asset (stock, ETF, bond, etc.) including total trades, buy/sell ratio, most active traders, and trading activity breakdown.
+Get comprehensive statistics for a specific asset (stock, ETF, mutual fund, bond) including total trades, buy/sell ratio, most active traders, and trading activity breakdown.
 
 **Parameters:**
 - `symbol` (required): Ticker or asset name (e.g., 'Apple', 'AAPL', 'VOO', 'Microsoft')
@@ -173,7 +184,7 @@ Get comprehensive statistics for a specific asset (stock, ETF, bond, etc.) inclu
 
 ### `get_buy_momentum_assets`
 
-Get assets with high buy momentum from politician trading activity. Shows assets where politicians are net buyers with scoring based on volume and conviction.
+Get assets (stocks, ETFs, mutual funds, bonds) with high buy momentum from politician trading activity. Shows assets where politicians are net buyers with scoring based on volume and conviction.
 
 **Parameters:**
 - `limit` (optional): Number of top assets to return (default: 10, max: 50)
@@ -191,7 +202,7 @@ Get assets with high buy momentum from politician trading activity. Shows assets
 
 ### `get_party_buy_momentum`
 
-Get buy momentum broken down by political party. Shows consensus assets (both parties buying), Democrat favorites, and Republican favorites.
+Get buy momentum broken down by political party. Shows consensus assets (stocks, ETFs, mutual funds, bonds) where both parties are buying, Democrat favorites, and Republican favorites.
 
 **Parameters:**
 - `limit` (optional): Number of top assets per category (default: 5, max: 20)
