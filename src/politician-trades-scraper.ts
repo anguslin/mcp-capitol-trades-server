@@ -11,6 +11,22 @@ const logDebug = (...args: any[]) => {
   }
 };
 
+// Simple in-memory cache for ID lookups (avoids redundant web requests)
+const idCache = new Map<string, { id: string; timestamp: number }>();
+const CACHE_TTL = 1000 * 60 * 10; // 10 minutes
+
+function getCachedId(key: string): string | null {
+  const cached = idCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.id;
+  }
+  return null;
+}
+
+function setCachedId(key: string, id: string): void {
+  idCache.set(key, { id, timestamp: Date.now() });
+}
+
 /**
  * Scrape a single page of trades from the /trades page
  * Uses cheerio for static HTML parsing
@@ -218,6 +234,13 @@ export async function scrapePoliticianTrades(url: string, limit: number = 50): P
  * @returns The issuer ID (e.g., "apple-inc", "microsoft-corp")
  */
 export async function getIssuerId(issuer: string): Promise<string> {
+  // Check cache first
+  const cachedId = getCachedId(`issuer:${issuer.toLowerCase()}`);
+  if (cachedId) {
+    logDebug(`Cache hit for issuer: ${issuer}`);
+    return cachedId;
+  }
+
   const url = "https://www.capitoltrades.com/issuers";
   const urlWithQueryParams = `${url}?search=${encodeURIComponent(issuer)}`;
 
@@ -245,6 +268,8 @@ export async function getIssuerId(issuer: string): Promise<string> {
       throw new Error(`Could not extract issuer ID from URL: ${linkResult.targetUrl}`);
     }
 
+    // Cache the result
+    setCachedId(`issuer:${issuer.toLowerCase()}`, issuerId);
     return issuerId;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -258,6 +283,13 @@ export async function getIssuerId(issuer: string): Promise<string> {
  * @returns The politician ID (e.g., "C001129")
  */
 export async function getPoliticianId(politician: string): Promise<string> {
+  // Check cache first
+  const cachedId = getCachedId(`politician:${politician.toLowerCase()}`);
+  if (cachedId) {
+    logDebug(`Cache hit for politician: ${politician}`);
+    return cachedId;
+  }
+
   const url = "https://www.capitoltrades.com/politicians";
   const urlWithQueryParams = `${url}?search=${encodeURIComponent(politician)}`;
 
@@ -285,6 +317,8 @@ export async function getPoliticianId(politician: string): Promise<string> {
       throw new Error(`Could not extract politician ID from URL: ${linkResult.targetUrl}`);
     }
 
+    // Cache the result
+    setCachedId(`politician:${politician.toLowerCase()}`, politicianId);
     return politicianId;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
