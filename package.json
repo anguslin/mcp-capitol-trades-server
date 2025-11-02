@@ -1,6 +1,6 @@
 {
   "name": "@anguslin/mcp-capitol-trades",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP Server for extracting politician stock trades with prices from Capitol Trades. No API key required.",
   "type": "module",
   "main": "build/src/index.js",
