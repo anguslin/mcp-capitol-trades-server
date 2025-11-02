@@ -57,11 +57,9 @@ Configure Cursor/VS Code to use the MCP server.
 **If you installed from npm (Option 1):**
 ```json
 {
-  "mcp": {
-    "servers": {
-      "mcp-capitol-trades": {
-        "command": "mcp-capitol-trades"
-      }
+  "mcpServers": {
+    "mcp-capitol-trades": {
+      "command": "mcp-capitol-trades"
     }
   }
 }
@@ -70,14 +68,12 @@ Configure Cursor/VS Code to use the MCP server.
 **If you installed from source (Option 2):**
 ```json
 {
-  "mcp": {
-    "servers": {
-      "mcp-capitol-trades": {
-        "command": "node",
-        "args": [
-          "C:/Users/anguslin/Projects/mcp-capitol-trades/build/src/index.js"
-        ]
-      }
+  "mcpServers": {
+    "mcp-capitol-trades": {
+      "command": "node",
+      "args": [
+       "C:/Users/anguslin/Projects/mcp-capitol-trades/build/src/index.js"
+      ]
     }
   }
 }
